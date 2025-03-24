@@ -17,8 +17,8 @@ A Node.js web scraper using Puppeteer to extract beverage product data from Carr
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/carrefour-scraper.git
-cd carrefour-scraper
+git clone https://github.com/vitucordeiro/challenge_web_scrapping
+cd challenge_web_scrapping
 ```
 
 2. Install dependencies
