@@ -7,7 +7,7 @@ const fs = require('fs');
  */
 async function bootstrap() {
     /** Initialize browser instance with headless mode */
-    const browser = await puppeteer.launch({ headless: false });
+    const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     
     /** Configure browser to mimic human user */
