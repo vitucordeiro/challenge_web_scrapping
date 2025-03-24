@@ -1,0 +1,24 @@
+{
+  "name": "web-scrap",
+  "version": "1.0.0",
+  "description": "Web Scrapper challenge",
+  "homepage": "https://github.com/vitucordeiro/challenge_web_scrapping#readme",
+  "bugs": {
+    "url": "https://github.com/vitucordeiro/challenge_web_scrapping/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vitucordeiro/challenge_web_scrapping.git"
+  },
+  "license": "ISC",
+  "author": "Victor Cordeiro",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.4.0"
+  }
+}
