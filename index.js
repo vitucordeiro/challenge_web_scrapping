@@ -6,7 +6,7 @@ const fs = require('fs');
  * Handles browser initialization, page navigation, data extraction and saving results
  */
 async function bootstrap() {
-    /** Initialize browser instance with headless mode */
+    /** Initialize browser instance */
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     
