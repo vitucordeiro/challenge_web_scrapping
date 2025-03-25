@@ -91,3 +91,14 @@ async function fetchProductsBatch(after = "0") {
       
     return allProducts;
 }
+
+extractAllProductsComplete()
+  .then(products => {
+    console.log('\n📊 Resumo final:');
+    console.log(`- Total de produtos: ${products.length}`);
+    console.log(`- Primeiro produto: ${products[0]?.name}`);
+    console.log(`- Último produto: ${products[products.length-1]?.name}`);
+  })
+  .catch(error => {
+    console.error('❌ Erro na execução:', error);
+  });
