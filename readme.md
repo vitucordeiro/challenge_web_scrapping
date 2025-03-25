@@ -8,7 +8,7 @@ A Node.js web scraper using Puppeteer to extract beverage product data from Carr
 ## Features
 
 - 📍 Automatic store location configuration (Piracicaba)
-- 📊 Pagination handling (60 items per page)
+- 📊 Pagination handling (100 items per page)
 - 🛒 Product data extraction
 - 🚫 Filters out sponsored products
 - 💾 Saves results to JSON file

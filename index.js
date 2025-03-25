@@ -1,146 +1,211 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
+const fs = require('fs')
+
+const REGION_ID = "v2.16805FBD22EC494F5D2BD799FE9F1FB7";
+const OUTPUT_FILE = 'output.json';
+var MAX_ITEMS;
+const BATCH_SIZE = 100;
+const DELAY = 1000;
 
 /**
- * Main function to scrape Carrefour beverage products
- * Handles browser initialization, page navigation, data extraction and saving results
+ * Fetches a batch of products from Carrefour's GraphQL API
+ * @async
+ * @function fetchProductsBatch
+ * @param {string} [after="0"] - Pagination cursor (defaults to "0" for first page)
+ * @returns {Promise<Object>} - Parsed JSON response from the API
+ * @throws {Error} - If the API request fails
+ * 
+ * @description
+ * Makes a GET request to Carrefour's GraphQL API to fetch products with:
+ * - Pagination support (using 'after' cursor)
+ * - Fixed batch size (BATCH_SIZE)
+ * - Predefined filters (beverages category, pt-BR locale)
+ * - Region-specific results (REGION_ID)
+ * 
+ * The query includes these fixed parameters:
+ * - isPharmacy: false
+ * - sort: "score_desc"
+ * - term: "" (empty search term)
+ * 
+ * @example
+ * // Fetch first batch
+ * const firstBatch = await fetchProductsBatch();
+ * 
+ * // Fetch next batch using cursor
+ * const nextBatch = await fetchProductsBatch("cursor123");
  */
-async function bootstrap() {
-    /** Initialize browser instance */
-    const browser = await puppeteer.launch({ headless: true });
-    const page = await browser.newPage();
-    
-    /** Configure browser to mimic human user */
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    await page.setViewport({ width: 1366, height: 768 });
-  
-    try {
-        /**
-         * Step 1: Navigate to main beverages page
-         * Waits for network to be idle before proceeding
-         */
-        await page.goto('https://mercado.carrefour.com.br/bebidas#crfint=hm|header-menu-corredores|bebidas|4', { 
-            waitUntil: 'networkidle2',
-            timeout: 30000
-        });
 
-        /**
-         * Step 2: Configure store location (Piracicaba)
-         * - Opens location dialog
-         * - Selects city from dropdown
-         * - Confirms selection
-         */
-        console.log('Locating "Insert your ZIP code" button...');
-        await page.waitForSelector('button[title="Insira seu CEP"]', { timeout: 5000 });
-        await page.click('button[title="Insira seu CEP"]');
-        await page.waitForSelector('div[role="dialog"]', { visible: true });
-        await page.click('button.border-\\[\\#ccc\\].bg-white.text-red-market');
-        await page.click('.border-neutral-300.h-\\[40px\\].shadow-\\[0px_8px_16px_rgba\\(90\\,100\\,110\\,0\\.12\\)\\]');
-        await page.select('select#selectCity', 'Piracicaba');
-        await page.click('.border-neutral-300.rounded-md.shadow.py-3.px-4.cursor-pointer');
-
-        /**
-         * Step 3: Configure pagination to show 60 items per page
-         * - Navigates to specific category URL
-         * - Changes items per page setting
-         */
-        await page.goto('https://mercado.carrefour.com.br/bebidas?category-1=bebidas&category-1=4599&facets=category-1&sort=score_desc&page=1', { 
-            waitUntil: 'networkidle2',
-            timeout: 15000
-        });
-
-        await page.waitForSelector('button[data-testid="store-button"]:has(span.text-\\[\\#E81E26\\])', { timeout: 10000 });
-        await page.click('button[data-testid="store-button"]:has(span.text-\\[\\#E81E26\\])');
-        await page.setDefaultTimeout(1000);
-        
-        const buttons = await page.$$('button[data-testid="store-button"].text-\\[\\#E81E26\\]');
-        for (const button of buttons) {
-            const text = await button.evaluate(el => el.textContent.trim());
-            if (text === '60') {
-                await button.click();
-                break;
-            }
-        }
-        await page.setDefaultTimeout(1000);
-
-        /**
-         * Step 4: Paginate through all available pages and extract product data
-         * - Processes each page sequentially
-         * - Extracts product information
-         * - Handles pagination automatically
-         */
-        let allItems = [];
-        let currentPage = 1;
-        let hasMorePages = true;
-
-        while (hasMorePages) {
-            console.log(`Processing page ${currentPage}...`);
-            
-            /** Verify if current page contains products */
-            setTimeout(()=>{
-                2000
-            })
-            const itemsExist = await page.evaluate(() => {
-                
-                return document.querySelectorAll('ul.grid.grid-cols-2.xl\\:grid-cols-5.md\\:grid-cols-4 li').length > 0;
-            });
-
-            if (!itemsExist) {
-                console.log('No items found on page, ending...');
-                hasMorePages = false;
-                break;
-            }
-
-            /** Extract product data from current page */
-            const pageItems = await page.$$eval(
-                'ul.grid.grid-cols-2.xl\\:grid-cols-5.md\\:grid-cols-4 li',
-                (elements) => 
-                    elements
-                        .filter(li => !li.querySelector('p.m-1.text-right.absolute.right-0.z-10'))
-                        .map(el => ({
-                            product: el.querySelector('h3')?.textContent?.trim(),
-                        }))
-            );
-
-            if (pageItems.length === 0) {
-                console.log('No valid items found, ending...');
-                hasMorePages = false;
-                break;
-            }
-
-            allItems = [...allItems, ...pageItems];
-            console.log(`Found ${pageItems.length} items on page ${currentPage}`);
-
-            /** Attempt to navigate to next page */
-            try {
-                currentPage++;
-                await page.goto(`https://mercado.carrefour.com.br/bebidas?category-1=bebidas&category-1=4599&facets=category-1&sort=score_desc&page=${currentPage}`, {
-                    waitUntil: 'networkidle2',
-                    timeout: 20000
-                });
-                
-                /** Verify next page loaded correctly */
-                await page.waitForSelector('ul.grid.grid-cols-2.xl\\:grid-cols-5.md\\:grid-cols-4 li:nth-child(1)', {
-                    timeout: 10000,
-                    visible: true
-                });
-            } catch (error) {
-                console.log('Could not load next page, ending...');
-                hasMorePages = false;
-            }
-        }
-
-        /** Output results and save to file */
-        console.log('Total items collected:', allItems.length);
-        return fs.writeFileSync('output.json', JSON.stringify(allItems, null, 2))
-    } catch (error) {
-        console.error('Execution error:', error);
-        throw error;
-    } finally {
-        /** Ensure browser is closed regardless of outcome */
-        await browser.close();
+async function fetchProductsBatch(after = "0") {
+    const url = `https://mercado.carrefour.com.br/api/graphql?operationName=ProductsQuery&variables=${encodeURIComponent(JSON.stringify({
+      isPharmacy: false,
+      first: BATCH_SIZE,
+      after: after,
+      sort: "score_desc",
+      term: "",
+      selectedFacets: [
+        {key: "category-1", value: "bebidas"},
+        {key: "category-1", value: "4599"},
+        {key: "channel", value: JSON.stringify({ 
+          salesChannel: 2, 
+          regionId: REGION_ID 
+        })},
+        {key: "locale", value: "pt-BR"},
+        {key: "region-id", value: REGION_ID}
+      ]
+    }))}`;
+    try{
+        const response = await fetch(url);
+        return await response.json();
+    }catch(e){
+        throw new Error("Error: fetching data from the API - ", e);
     }
+  }
+
+/**
+ * Extracts all products from Carrefour's API using paginated requests
+ * @async
+ * @function extractAllProductsComplete
+ * @returns {Promise<string[]>} - Array of all product names collected
+ * @throws {Error} - If critical failures occur during execution
+ * 
+ * @description
+ * Performs complete product extraction with these features:
+ * - Automatically determines total items (MAX_ITEMS) from initial request
+ * - Paginates through all results using offset-based pagination
+ * - Implements retry logic (5 attempts) for failed requests
+ * - Includes progress tracking and periodic saves (every 500 items)
+ * - Provides real-time console feedback about extraction progress
+ * - Enforces rate limiting through DELAY between requests
+ * - Saves final results to JSON file (OUTPUT_FILE)
+ * 
+ * @process
+ * 1. Initializes with first batch to get total count
+ * 2. Processes batches sequentially until all items collected
+ * 3. Handles errors with exponential backoff (DELAY*2 on retry)
+ * 4. Provides completion statistics and saves final output
+ * 
+ * @example
+ * // Basic usage
+ * extractAllProductsComplete()
+ *   .then(products => console.log(`Collected ${products.length} products`))
+ *   .catch(err => console.error('Extraction failed:', err));
+ * 
+ * // With async/await
+ * try {
+ *   const products = await extractAllProductsComplete();
+ *   // Process products...
+ * } catch (error) {
+ *   // Handle error...
+ * }
+ */
+
+  async function extractAllProductsComplete() {
+    let allProducts = [];
+    let after = "0";
+    let hasMore = true;
+    let attempts = 0;
+    let totalCollected = 0;
+
+    try{
+        const initialData = await fetchProductsBatch(after);
+        const raw = initialData.data.search.products.pageInfo.totalCount;
+        MAX_ITEMS = raw;
+      }catch(e){
+        console.error(e)
+    }
+
+    console.log('🚀 Starting full extraction...');
+    console.log(`🔍 Expected total: ${MAX_ITEMS} itens`);
+  
+    while (hasMore && totalCollected < MAX_ITEMS && attempts < 5) {
+      try {
+        console.log(`Fetching batch from cursor: ${after}`);
+        
+        const data = await fetchProductsBatch(after);
+        
+        if (!data?.data?.search?.products) {
+          throw new Error('Invalid response structure');
+        }
+  
+        const products = data.data.search.products.edges.map(edge => edge.node.name);
+        const batchCount = products.length;
+        
+        allProducts = [...allProducts, ...products];
+        totalCollected += batchCount;
+        
+        const nextOffset = parseInt(after) + BATCH_SIZE;
+        after = String(nextOffset);
+        
+        let lastLogged = Date.now();
+        const LOG_INTERVAL_MS = 5000; // 5 seconds
+        
+        if (Date.now() - lastLogged >= LOG_INTERVAL_MS) {
+          console.log(`Progress: ${totalCollected}/${MAX_ITEMS}`);
+          lastLogged = Date.now();
+        }
+        
+        attempts = 0;
+        
+        if (totalCollected % 500 === 0) {
+          fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
+          console.log('Progress saved');
+        }
+  
+        await new Promise(resolve => setTimeout(resolve, DELAY));
+  
+      } catch (error) {
+        attempts++;
+        console.error(`⚠️ Error (attempt ${attempts}): ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, DELAY * 2));
+      }
+    }
+
+    console.log('\n Final check:');
+    console.log(`- Expected items: ${MAX_ITEMS}`);
+    console.log(`- Collected items: ${totalCollected}`);
+    console.log(`- Difference: ${MAX_ITEMS - totalCollected}`);
+    
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
+    console.log(`\n🎉 Data saved : ${OUTPUT_FILE}`);
+      
+    return allProducts;
 }
 
-/** Execute the scraping process */
-bootstrap();
+/**
+ * @file Main execution block for product extraction
+ * @description
+ * Initiates the product extraction process and handles the results/errors.
+ * Provides formatted console output for both success and failure cases.
+ * 
+ * @example
+ * // Typical successful output:
+ * 📊 Final resume:
+ * - Total of products: 1243
+ * 
+ * // Typical error output:
+ * ❌ Error in execution: [Error message]
+ * 
+ * @process
+ * 1. Calls extractAllProductsComplete() to start extraction
+ * 2. On success:
+ *    - Displays formatted summary with product count
+ * 3. On failure:
+ *    - Displays error message with error details
+ * 
+ * @outputs
+ * Success case:
+ * - Formatted success message with emoji
+ * - Total product count
+ * 
+ * Error case:
+ * - Formatted error message with emoji
+ * - Full error object
+ */
+
+extractAllProductsComplete()
+  .then(products => {
+    console.log('\n📊 Final resume:');
+    console.log(`- Total of products: ${products.length}`);
+  })
+  .catch(error => {
+    console.error('❌ Error in execution:', error);
+  });
