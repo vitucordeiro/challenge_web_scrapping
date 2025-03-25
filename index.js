@@ -39,7 +39,15 @@ async function fetchProductsBatch(after = "0") {
     let hasMore = true;
     let attempts = 0;
     let totalCollected = 0;
-  
+
+    try{
+        const initialData = await fetchProductsBatch(after);
+        MAX_ITEMS = initialData.data.search.products.pageInfo.totalCount;
+        console.log(`🔍 Total esperado: ${MAX_ITEMS} itens`);
+      }catch(e){
+        throw new Error("Error: fetching MAX_ITEMS from the API - ", e);
+    }
+
     console.log('🚀 Iniciando extração completa...');
     console.log(`🔍 Total esperado: ${MAX_ITEMS} itens`);
   
