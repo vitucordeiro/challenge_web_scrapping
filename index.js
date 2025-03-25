@@ -80,4 +80,14 @@ async function fetchProductsBatch(after = "0") {
         await new Promise(resolve => setTimeout(resolve, DELAY * 2));
       }
     }
+
+    console.log('\n Verificação final:');
+    console.log(`- Itens esperados: ${MAX_ITEMS}`);
+    console.log(`- Itens coletados: ${totalCollected}`);
+    console.log(`- Diferença: ${MAX_ITEMS - totalCollected}`);
+    
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
+    console.log(`\n🎉 Dados salvos em ${OUTPUT_FILE}`);
+      
+    return allProducts;
 }
