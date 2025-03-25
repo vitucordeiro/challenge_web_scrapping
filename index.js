@@ -32,4 +32,52 @@ async function fetchProductsBatch(after = "0") {
     }
   }
 
+
+  async function extractAllProductsComplete() {
+    let allProducts = [];
+    let after = "0";
+    let hasMore = true;
+    let attempts = 0;
+    let totalCollected = 0;
   
+    console.log('🚀 Iniciando extração completa...');
+    console.log(`🔍 Total esperado: ${MAX_ITEMS} itens`);
+  
+    while (hasMore && totalCollected < MAX_ITEMS && attempts < 5) {
+      try {
+        console.log(`Buscando lote a partir do cursor: ${after}`);
+        
+        const data = await fetchProductsBatch(after);
+        
+        if (!data?.data?.search?.products) {
+          throw new Error('Estrutura de resposta inválida');
+        }
+  
+        const products = data.data.search.products.edges.map(edge => edge.node.name);
+        const batchCount = products.length;
+        
+        allProducts = [...allProducts, ...products];
+        totalCollected += batchCount;
+        
+        hasMore = data.data.search.products.pageInfo.hasNextPage;
+        after = data.data.search.products.pageInfo.endCursor;
+        
+        console.log(`✅ ${batchCount} itens coletados | Total: ${totalCollected}/${MAX_ITEMS}`);
+        console.log(`➡️ Próximo cursor: ${after}`);
+  
+        attempts = 0;
+        
+        if (totalCollected % 500 === 0) {
+          fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
+          console.log('Progresso salvo');
+        }
+  
+        await new Promise(resolve => setTimeout(resolve, DELAY));
+  
+      } catch (error) {
+        attempts++;
+        console.error(`⚠️ Erro (tentativa ${attempts}): ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, DELAY * 2));
+      }
+    }
+}
