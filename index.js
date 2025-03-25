@@ -2,7 +2,7 @@ const fs = require('fs')
 
 const REGION_ID = "v2.16805FBD22EC494F5D2BD799FE9F1FB7";
 const OUTPUT_FILE = 'output.json';
-const MAX_ITEMS = 0; 
+var MAX_ITEMS;
 const BATCH_SIZE = 100;
 const DELAY = 1000;
 
@@ -42,23 +42,23 @@ async function fetchProductsBatch(after = "0") {
 
     try{
         const initialData = await fetchProductsBatch(after);
-        MAX_ITEMS = initialData.data.search.products.pageInfo.totalCount;
-        console.log(`🔍 Total esperado: ${MAX_ITEMS} itens`);
+        const raw = initialData.data.search.products.pageInfo.totalCount;
+        MAX_ITEMS = raw;
       }catch(e){
-        throw new Error("Error: fetching MAX_ITEMS from the API - ", e);
+        console.error(e)
     }
 
-    console.log('🚀 Iniciando extração completa...');
-    console.log(`🔍 Total esperado: ${MAX_ITEMS} itens`);
+    console.log('🚀 Starting full extraction...');
+    console.log(`🔍 Expected total: ${MAX_ITEMS} itens`);
   
     while (hasMore && totalCollected < MAX_ITEMS && attempts < 5) {
       try {
-        console.log(`Buscando lote a partir do cursor: ${after}`);
+        console.log(`Fetching batch from cursor: ${after}`);
         
         const data = await fetchProductsBatch(after);
         
         if (!data?.data?.search?.products) {
-          throw new Error('Estrutura de resposta inválida');
+          throw new Error('Invalid response structure');
         }
   
         const products = data.data.search.products.edges.map(edge => edge.node.name);
@@ -67,46 +67,45 @@ async function fetchProductsBatch(after = "0") {
         allProducts = [...allProducts, ...products];
         totalCollected += batchCount;
         
-        hasMore = data.data.search.products.pageInfo.hasNextPage;
-        after = data.data.search.products.pageInfo.endCursor;
+        const nextOffset = parseInt(after) + BATCH_SIZE;
+        after = String(nextOffset);
         
-        console.log(`✅ ${batchCount} itens coletados | Total: ${totalCollected}/${MAX_ITEMS}`);
-        console.log(`➡️ Próximo cursor: ${after}`);
+        
+        console.log(`✅ ${batchCount} collected items | Total: ${totalCollected}/${MAX_ITEMS}`);
+        console.log(`➡️ Next cursor: ${after}`);
   
         attempts = 0;
         
         if (totalCollected % 500 === 0) {
           fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
-          console.log('Progresso salvo');
+          console.log('Progress saved');
         }
   
         await new Promise(resolve => setTimeout(resolve, DELAY));
   
       } catch (error) {
         attempts++;
-        console.error(`⚠️ Erro (tentativa ${attempts}): ${error.message}`);
+        console.error(`⚠️ Error (attempt ${attempts}): ${error.message}`);
         await new Promise(resolve => setTimeout(resolve, DELAY * 2));
       }
     }
 
-    console.log('\n Verificação final:');
-    console.log(`- Itens esperados: ${MAX_ITEMS}`);
-    console.log(`- Itens coletados: ${totalCollected}`);
-    console.log(`- Diferença: ${MAX_ITEMS - totalCollected}`);
+    console.log('\n Final check:');
+    console.log(`- Expected items: ${MAX_ITEMS}`);
+    console.log(`- Collected items: ${totalCollected}`);
+    console.log(`- Difference: ${MAX_ITEMS - totalCollected}`);
     
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allProducts, null, 2));
-    console.log(`\n🎉 Dados salvos em ${OUTPUT_FILE}`);
+    console.log(`\n🎉 Data saved : ${OUTPUT_FILE}`);
       
     return allProducts;
 }
 
 extractAllProductsComplete()
   .then(products => {
-    console.log('\n📊 Resumo final:');
-    console.log(`- Total de produtos: ${products.length}`);
-    console.log(`- Primeiro produto: ${products[0]?.name}`);
-    console.log(`- Último produto: ${products[products.length-1]?.name}`);
+    console.log('\n📊 Final resume:');
+    console.log(`- Total of products: ${products.length}`);
   })
   .catch(error => {
-    console.error('❌ Erro na execução:', error);
+    console.error('❌ Error in execution:', error);
   });
